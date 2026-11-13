@@ -1561,6 +1561,44 @@ document.querySelectorAll('input[data-sem-enter]').forEach(input => {
 })();
 
 
+// Formulários que gravam (POST): o botão clicado mostra que está enviando e um segundo clique não reenvia
+// (resposta lenta levava a clicar de novo). Roda depois das confirmações: se a pessoa cancelou, nada muda.
+document.addEventListener('submit', ev => {
+
+    const form = ev.target;
+
+    if (ev.defaultPrevented || (form.getAttribute('method') || '').toLowerCase() !== 'post' || form.getAttribute('target')) return;
+
+    if (form.dataset.enviando) { ev.preventDefault(); return; }
+
+    form.dataset.enviando = '1';
+
+    const btn = ev.submitter;
+
+    if (!btn || btn.tagName !== 'BUTTON' || btn.disabled) return; // botão já tratado (ex.: Finalizar venda)
+
+    btn.setAttribute('aria-disabled', 'true');
+
+    btn.classList.add('enviando');
+
+    btn.insertAdjacentHTML('afterbegin', '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span><span class="visually-hidden">Enviando… </span>');
+});
+
+// Voltar pelo navegador para uma página guardada na memória: botões voltam ao normal
+window.addEventListener('pageshow', ev => {
+
+    if (!ev.persisted) return;
+
+    document.querySelectorAll('form[data-enviando]').forEach(f => delete f.dataset.enviando);
+
+    document.querySelectorAll('button.enviando').forEach(btn => {
+        btn.classList.remove('enviando');
+        btn.removeAttribute('aria-disabled');
+        btn.querySelectorAll('.spinner-border, .spinner-border + .visually-hidden').forEach(el => el.remove());
+    });
+});
+
+
 // Sair: apaga os carrinhos guardados neste navegador (a sessão expirada não passa por aqui, e aí o carrinho fica para o novo login)
 document.querySelectorAll('form[action="index.php?page=logout"]').forEach(f => f.addEventListener('submit', () => {
 
