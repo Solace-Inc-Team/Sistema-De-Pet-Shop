@@ -237,6 +237,36 @@ document.querySelectorAll('[data-imprimir-cupom]').forEach(btn => {
 });
 
 
+// <button data-imprimir-secao="id">: imprime só aquela seção da página (ex.: lista de compras do Estoque)
+
+document.querySelectorAll('[data-imprimir-secao]').forEach(btn => {
+
+    btn.addEventListener('click', () => {
+        const secao = document.getElementById(btn.dataset.imprimirSecao);
+        document.body.classList.add('imprimir-secao');
+        secao.classList.add('imprimindo');
+        window.addEventListener('afterprint', () => { document.body.classList.remove('imprimir-secao'); secao.classList.remove('imprimindo'); }, { once: true });
+        window.print();
+    });
+});
+
+// Lista de compras: abre o WhatsApp com o texto pronto (sem número: a pessoa escolhe o fornecedor); quantidade 0 fica de fora
+
+document.querySelectorAll('[data-whatsapp-compras]').forEach(btn => {
+
+    btn.addEventListener('click', () => {
+        const tabela = document.querySelector('[data-lista-compras]');
+        const itens = [...tabela.querySelectorAll('tbody tr')]
+            .map(tr => [tr.querySelector('[data-produto]').textContent.trim(), parseInt(tr.querySelector('.qtd-compra').value, 10) || 0])
+            .filter(([, qtd]) => qtd > 0)
+            .map(([nome, qtd]) => `- ${nome}: ${qtd} un.`);
+        if (!itens.length) { alert('Coloque a quantidade de pelo menos um produto.'); return; }
+        const texto = `Pedido - ${tabela.dataset.loja} - ${new Date().toLocaleDateString('pt-BR')}\n\n${itens.join('\n')}`;
+        window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+    });
+});
+
+
 // Celular: cada célula recebe o nome da coluna (data-label), que o CSS mostra quando a tabela vira cartões
 
 function rotularTabela(tabela) {

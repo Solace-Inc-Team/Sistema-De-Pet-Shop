@@ -177,6 +177,30 @@ class Estoque {
         } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
     }
 
+    /**
+     * Lista de compras: produtos no mínimo ou abaixo e os que chegam nele em até 14 dias pela venda dos últimos 30.
+     * Sugestão = 30 dias de venda + mínimo − estoque, e pelo menos o que falta para o dobro do mínimo (produto parado).
+     * Mínimo 0 = não controla reposição (mesma regra de Produto::precisaRepor).
+     */
+    public static function listaCompras(): array {
+        $st = Database::pdo()->prepare("SELECT p.id, p.nome, p.estoque, p.estoque_minimo, p.preco_custo,
+                COALESCE((SELECT -SUM(m.quantidade) FROM movimentacoes_estoque m
+                    WHERE m.produto_id = p.id AND m.tipo IN ('venda', 'devolucao', 'cancelamento') AND m.criado_em >= ?), 0) AS vendidos30,
+                (SELECT e.fornecedor FROM entradas_estoque e WHERE e.produto_id = p.id AND TRIM(e.fornecedor) <> '' ORDER BY e.id DESC LIMIT 1) AS fornecedor
+            FROM produtos p WHERE p.ativo = 1 AND p.estoque_minimo > 0 ORDER BY p.nome");
+        $st->execute([date('Y-m-d', strtotime('-30 days'))]);
+        $lista = [];
+        foreach ($st->fetchAll() as $p) {
+            $vendidos = max(0, (int) $p['vendidos30']); // 30 dias de venda: é a própria cobertura da sugestão
+            $folga = $p['estoque'] - $p['estoque_minimo'];
+            if ($folga > 0 && ($vendidos === 0 || $folga * 30 / $vendidos > 14)) continue;
+            $p['por_semana'] = round($vendidos * 7 / 30, 1);
+            $p['sugestao'] = max($vendidos + $p['estoque_minimo'] - $p['estoque'], 2 * $p['estoque_minimo'] - $p['estoque'], 1);
+            $lista[] = $p;
+        }
+        return $lista;
+    }
+
     /** Últimas movimentações, filtradas pela mesma busca da tela (produto, código de barras ou lote) */
     public static function movimentacoes(string $busca = '', int $limite = 30): array {
         $sql = 'SELECT m.*, p.nome AS produto, l.codigo AS lote, l.validade, u.nome AS usuario FROM movimentacoes_estoque m JOIN produtos p ON p.id = m.produto_id LEFT JOIN lotes l ON l.id = m.lote_id LEFT JOIN usuarios u ON u.id = m.usuario_id';

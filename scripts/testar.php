@@ -450,6 +450,30 @@ try {
     Caixa::fechar('0', '');
     $_SESSION = $sessaoAntes;
 
+    // Lista de compras: no mínimo, chegando nele em até 14 dias pela venda dos últimos 30, parado, inativo e mínimo 0
+    $novo = function (string $nome, int $min, int $qtd, int $vendidos30, int $vendidosAntes = 0) use ($pdo): int {
+        Produto::salvar(['nome' => $nome, 'preco' => '10,00', 'estoque_minimo' => (string) $min]);
+        $id = (int) $pdo->query("SELECT id FROM produtos WHERE nome = '$nome'")->fetchColumn();
+        if ($qtd) Estoque::entrada($id, $qtd, "Fornecedor $nome");
+        $mov = $pdo->prepare("INSERT INTO movimentacoes_estoque (produto_id, tipo, quantidade, criado_em) VALUES (?, 'venda', ?, datetime('now', 'localtime', ?))");
+        if ($vendidos30) $mov->execute([$id, -$vendidos30, '-5 days']);
+        if ($vendidosAntes) $mov->execute([$id, -$vendidosAntes, '-40 days']); // fora dos 30 dias: não conta
+        return $id;
+    };
+    $noMinimo = $novo('LC no minimo', 5, 5, 0);           // parado: sugere chegar ao dobro do mínimo (10 - 5)
+    $rapido = $novo('LC vende rapido', 5, 20, 30);        // 1/dia: chega no mínimo em 15 dias? folga 15 > 14, fica de fora
+    $chegando = $novo('LC chegando', 5, 15, 30, 300);     // 1/dia, folga 10 <= 14: entra; 30 + 5 - 15 = 20
+    $folgado = $novo('LC folgado', 5, 50, 3);             // folga grande: fica de fora
+    $semMinimo = $novo('LC sem minimo', 0, 0, 30);        // mínimo 0 não controla reposição
+    $inativo = $novo('LC inativo', 5, 1, 0);
+    Produto::excluir($inativo);
+    $lista = array_column(Estoque::listaCompras(), null, 'id');
+    ok(isset($lista[$noMinimo]) && $lista[$noMinimo]['sugestao'] === 5, 'lista de compras: produto parado no mínimo sugere completar o dobro do mínimo (5)');
+    ok(isset($lista[$chegando]) && $lista[$chegando]['sugestao'] === 20, 'lista de compras: chega no mínimo em 10 dias e sugere 30 dias de venda + mínimo − estoque (20); venda de 40 dias atrás não conta');
+    ok(($lista[$chegando]['fornecedor'] ?? '') === 'Fornecedor LC chegando', 'lista de compras mostra o último fornecedor');
+    ok(!isset($lista[$rapido]) && !isset($lista[$folgado]), 'lista de compras deixa de fora quem só chega no mínimo depois de 14 dias');
+    ok(!isset($lista[$semMinimo]) && !isset($lista[$inativo]), 'lista de compras ignora mínimo 0 e produto excluído');
+
     $_SESSION = [];
 } catch (Throwable $e) {
     echo 'ERRO - ' . get_class($e) . ': ' . $e->getMessage() . "\n";

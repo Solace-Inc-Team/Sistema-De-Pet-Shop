@@ -66,7 +66,7 @@ $rotuloSituacao = [
 
 // A página é longa: atalhos para as seções que este perfil vê
 $secoes = ($gerencia ? ['est-entrada' => 'Entrada'] : []) + ['alertas' => 'Alertas']
-  + ($gerencia ? ['est-baixa' => 'Baixa'] : []) + ['est-posicao' => 'Posição', 'est-lotes' => 'Lotes']
+  + ($gerencia ? ['est-compras' => 'Compras', 'est-baixa' => 'Baixa'] : []) + ['est-posicao' => 'Posição', 'est-lotes' => 'Lotes']
   + ($gerencia ? ['est-movimentacoes' => 'Movimentações'] : []);
 
 ?>
@@ -176,6 +176,65 @@ $secoes = ($gerencia ? ['est-entrada' => 'Entrada'] : []) + ['alertas' => 'Alert
 <?php require BASE_PATH . '/app/Views/alertas.php'; ?>
 
 <?php if ($gerencia): ?>
+
+  <?php $compras = Estoque::listaCompras(); ?>
+
+  <section class="card card-body mb-3" id="est-compras"<?= $busca === '' ? ' data-recolher' : '' ?>>
+
+    <h2>Lista de compras</h2>
+
+    <?php if (!$compras): ?>
+
+      <p class="vazio">Nada para comprar: nenhum produto no mínimo nem chegando nele nos próximos 14 dias.</p>
+
+    <?php else: ?>
+
+      <p class="nota nao-imprimir">Produtos no mínimo ou que chegam nele em até 14 dias, pela venda dos últimos 30. A sugestão cobre mais 30 dias de venda; ajuste a quantidade antes de imprimir ou enviar.</p>
+
+      <div class="table-responsive"><table class="table table-hover align-middle" data-lista-compras data-loja="<?= e(config('loja')['nome'] ?? config('app_nome')) ?>">
+
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th class="num">Estoque</th>
+            <th class="num">Mínimo</th>
+            <th class="num">Vende por semana</th>
+            <th class="num">Comprar</th>
+            <th>Último fornecedor</th>
+            <th class="num">Custo un.</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          <?php foreach ($compras as $c): ?>
+
+            <tr>
+              <td data-produto><?= e($c['nome']) ?></td>
+              <td class="num"><?= $c['estoque'] ?></td>
+              <td class="num"><?= $c['estoque_minimo'] ?></td>
+              <td class="num"><?= number_format($c['por_semana'], 1, ',', '') ?></td>
+              <td class="num">
+                <input class="form-control form-control-sm qtd-compra" autocomplete="off" type="number" min="0" max="99999" value="<?= $c['sugestao'] ?>" aria-label="Comprar de <?= e($c['nome']) ?>">
+              </td>
+              <td><?= e($c['fornecedor'] ?? '—') ?></td>
+              <td class="num"><?= $c['preco_custo'] > 0 ? moeda($c['preco_custo']) : '—' ?></td>
+            </tr>
+
+          <?php endforeach; ?>
+
+        </tbody>
+
+      </table></div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-light" data-imprimir-secao="est-compras"><i class="bi bi-printer" aria-hidden="true"></i> Imprimir</button>
+        <button type="button" class="btn btn-light" data-whatsapp-compras><i class="bi bi-whatsapp" aria-hidden="true"></i> Enviar pelo WhatsApp</button>
+      </div>
+
+    <?php endif; ?>
+
+  </section>
 
   <section class="card card-body mb-3" id="est-baixa"<?= $busca === '' ? ' data-recolher' : '' ?>>
 

@@ -747,6 +747,8 @@ small.busca-aviso { display: block; width: 0; min-width: 100%; margin: .25rem 0 
   .so-imprimir { display: inline; }
   section.recolhida > :not(h2) { display: revert !important; } /* mesma força da regra do celular, vem depois: vence */
   main:has(.comprovante) > :not(.comprovante) { display: none !important; }
+  body.imprimir-secao .conteudo > :not(.imprimindo, .pagina-topo) { display: none !important; } /* data-imprimir-secao (app.js) */
+  .qtd-compra { border: 0; padding: 0; text-align: right; background: none; }
   .comprovante { border: 0; max-width: none; margin: 0; padding: 0; box-shadow: none; -webkit-mask: none; mask: none; }
 }
 
@@ -822,3 +824,6 @@ small.busca-aviso { display: block; width: 0; min-width: 100%; margin: .25rem 0 
 .gaveta-form .form-check .form-check-input:not([type="file"]) { float: none; margin: 0; flex: none; width: 1.15rem; height: 1.15rem; min-height: 0; padding: 0; }
 .resumo-gaveta .alerta-negativo { grid-column: 1 / -1; text-align: left; white-space: normal; color: var(--erro); font-size: .85rem; margin-top: .4rem; }
 .resumo-gaveta { grid-template-columns: 1fr auto; } .resumo-gaveta dd { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Lista de compras (Estoque) */
+.qtd-compra { width: 5.5rem; margin-left: auto; text-align: right; }
