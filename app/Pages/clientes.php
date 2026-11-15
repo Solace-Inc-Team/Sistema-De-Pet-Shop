@@ -147,9 +147,12 @@ $acoesTopo = '<button class="btn btn-primary" type="button" data-bs-toggle="offc
 // o vendedor não tem Dashboard: as próximas doses aparecem aqui (fora da busca, para não empurrar o resultado)
 $avisoDoses = (int) config('doses_aviso_dias');
 $doses = $busca === '' ? Cliente::dosesAVencer($avisoDoses) : [];
+$retornos = $busca === '' ? Agenda::retornos() : [];
 ?>
 
 <?php require BASE_PATH . '/app/Views/doses.php'; ?>
+
+<?php require BASE_PATH . '/app/Views/retornos.php'; ?>
 
 <section class="card card-body mb-3">
 

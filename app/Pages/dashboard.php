@@ -128,6 +128,8 @@ $variacao = function (?float $pct): string {
 
 <?php require BASE_PATH . '/app/Views/doses.php'; ?>
 
+<?php $retornos = temPerfil(['admin', 'vendedor']) ? Agenda::retornos() : []; require BASE_PATH . '/app/Views/retornos.php'; ?>
+
 <section class="card card-body mb-3">
     <div class="card-titulo card-titulo-quebra">
         <div>

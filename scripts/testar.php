@@ -474,6 +474,31 @@ try {
     ok(!isset($lista[$rapido]) && !isset($lista[$folgado]), 'lista de compras deixa de fora quem só chega no mínimo depois de 14 dias');
     ok(!isset($lista[$semMinimo]) && !isset($lista[$inativo]), 'lista de compras ignora mínimo 0 e produto excluído');
 
+    // Retorno do banho: atrasado pela média do pet, pelos 30 dias padrão, com horário marcado, há mais de 90 dias, cancelado/faltou não contam
+    $dono = Cliente::salvar(['nome' => 'Rita Retorno', 'telefone' => '91 97777-0000']);
+    $servico = (int) $pdo->query('SELECT id FROM servicos LIMIT 1')->fetchColumn();
+    $pet = function (string $nome, array $atendimentos) use ($pdo, $dono, $servico): int {
+        Cliente::salvarPet(['cliente_id' => $dono, 'nome' => $nome, 'especie' => 'cao']);
+        $id = (int) $pdo->query("SELECT id FROM pets WHERE nome = '$nome'")->fetchColumn();
+        $ins = $pdo->prepare("INSERT INTO agendamentos (cliente_id, pet_id, servico_id, inicio, fim, preco, status) VALUES (?, ?, ?, ?, ?, 45, ?)");
+        foreach ($atendimentos as [$dias, $status]) {
+            $quando = date('Y-m-d 10:00', strtotime("$dias days"));
+            $ins->execute([$dono, $id, $servico, $quando, $quando, $status]);
+        }
+        return $id;
+    };
+    $quinzenal = $pet('RT quinzenal', [[-50, 'pago'], [-35, 'pago'], [-20, 'pronto']]);        // média 15, faz 20: atrasado
+    $emDia = $pet('RT em dia', [[-40, 'pago'], [-20, 'pago'], [-10, 'pago']]);                 // média 15, faz 10: em dia
+    $umSo = $pet('RT um so', [[-31, 'pago'], [-5, 'cancelado'], [-3, 'faltou']]);              // 1 atendimento (cancelado e falta não contam): 30 dias, faz 31
+    $marcado = $pet('RT marcado', [[-40, 'pago'], [3, 'agendado']]);                           // atrasado, mas já tem horário
+    $sumido = $pet('RT sumido', [[-120, 'pago'], [-95, 'pago']]);                              // faz 95 dias: passou do limite
+    $ret = array_column(Agenda::retornos(), null, 'pet_id');
+    ok(isset($ret[$quinzenal]) && $ret[$quinzenal]['intervalo'] === 15 && $ret[$quinzenal]['faz_dias'] === 20, 'retorno: pet que vem a cada 15 dias aparece com 20 dias sem vir');
+    ok(!isset($ret[$emDia]), 'retorno: pet dentro do intervalo de costume não aparece');
+    ok(isset($ret[$umSo]) && $ret[$umSo]['intervalo'] === Agenda::RETORNO_PADRAO_DIAS, 'retorno: pet com um atendimento usa 30 dias; cancelado e falta não contam');
+    ok(!isset($ret[$marcado]) && !isset($ret[$sumido]), 'retorno: com horário marcado ou há mais de 90 dias fica de fora');
+    ok(str_contains(Agenda::mensagemRetorno($ret[$quinzenal]), 'Olá, Rita! ') && str_contains(Agenda::mensagemRetorno($ret[$quinzenal]), '20 dias do último banho de RT quinzenal'), 'retorno: mensagem do WhatsApp com o primeiro nome e os dias');
+
     $_SESSION = [];
 } catch (Throwable $e) {
     echo 'ERRO - ' . get_class($e) . ': ' . $e->getMessage() . "\n";

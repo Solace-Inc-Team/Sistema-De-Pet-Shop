@@ -243,6 +243,44 @@ class Agenda {
         return $h;
     }
 
+    const RETORNO_PADRAO_DIAS = 30;   // pet com um atendimento só: sem histórico para tirar a média
+    const RETORNO_LIMITE_DIAS = 90;   // sem vir há mais tempo: sai do aviso (como a dose vencida há muito tempo)
+
+    /**
+     * Pets atrasados para voltar: passou do intervalo de costume desde o último atendimento concluído (pronto ou pago).
+     * Intervalo = média entre os últimos 6 atendimentos (2 ou mais) ou RETORNO_PADRAO_DIAS. Quem já tem horário marcado fica de fora.
+     */
+    public static function retornos(): array {
+        $linhas = Database::pdo()->query("SELECT a.pet_id, date(a.inicio) AS dia, p.nome AS pet, p.especie, c.id AS cliente_id, c.nome AS cliente, c.telefone
+            FROM agendamentos a JOIN pets p ON p.id = a.pet_id JOIN clientes c ON c.id = a.cliente_id
+            WHERE a.status IN ('pronto', 'pago') AND a.inicio <= strftime('%Y-%m-%d %H:%M', 'now', 'localtime') AND p.ativo = 1 AND c.ativo = 1
+              AND NOT EXISTS (SELECT 1 FROM agendamentos f WHERE f.pet_id = a.pet_id AND f.status IN ('agendado', 'em_atendimento', 'pronto', 'pago')
+                  AND f.inicio > strftime('%Y-%m-%d %H:%M', 'now', 'localtime'))
+            ORDER BY a.pet_id, a.inicio")->fetchAll();
+        $porPet = [];
+        foreach ($linhas as $l) { $porPet[$l['pet_id']]['dados'] = $l; $porPet[$l['pet_id']]['dias'][$l['dia']] = true; }
+        $hoje = new DateTime('today');
+        $lista = [];
+        foreach ($porPet as $p) {
+            $dias = array_slice(array_keys($p['dias']), -6);
+            $ultimo = new DateTime(end($dias));
+            $intervalo = count($dias) > 1
+                ? max(7, (int) round((new DateTime($dias[0]))->diff($ultimo)->days / (count($dias) - 1)))
+                : self::RETORNO_PADRAO_DIAS;
+            $faz = $ultimo->diff($hoje)->days;
+            if ($faz <= $intervalo || $faz > self::RETORNO_LIMITE_DIAS) continue;
+            $lista[] = $p['dados'] + ['ultimo' => end($dias), 'faz_dias' => $faz, 'intervalo' => $intervalo];
+        }
+        usort($lista, fn($a, $b) => ($b['faz_dias'] - $b['intervalo']) <=> ($a['faz_dias'] - $a['intervalo']));
+        return $lista;
+    }
+
+    /** Mensagem pronta para chamar o dono de um pet atrasado (ver retornos) */
+    public static function mensagemRetorno(array $r): string {
+        return 'Olá, ' . Cliente::primeiroNome($r['cliente']) . '! Aqui é da ' . (config('loja')['nome'] ?? config('app_nome'))
+            . ". Já faz {$r['faz_dias']} dias do último banho de {$r['pet']}. Quer agendar um horário?";
+    }
+
     /** Mensagem pronta do WhatsApp: 'lembrete' (do horário marcado) ou 'pronto' (pode vir buscar) */
     public static function mensagem(array $a, string $tipo): string {
         $oi = 'Olá, ' . Cliente::primeiroNome($a['cliente']) . '! Aqui é da ' . (config('loja')['nome'] ?? config('app_nome')) . '. ';
